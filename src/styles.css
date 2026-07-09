@@ -217,7 +217,7 @@ footer a:hover {
   border: 1px solid var(--ink);
   background: var(--ink);
   color: var(--bg);
-  min-height: 390px;
+  min-height: 360px;
   padding: 20px;
   isolation: isolate;
 }
@@ -241,43 +241,55 @@ footer a:hover {
   font-weight: 720;
 }
 
-.signal-grid {
+.signal-map {
+  position: absolute;
+  inset: 78px 30px 34px;
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
-  margin: 54px 0 42px;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 16px;
 }
 
-.signal-grid span {
+.signal-map::before,
+.signal-map::after {
+  position: absolute;
+  content: "";
+  background: oklch(0.9 0.01 250 / 0.18);
+}
+
+.signal-map::before {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: 1px;
+}
+
+.signal-map::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+}
+
+.signal-map span {
+  position: relative;
   display: block;
+  align-self: center;
+  justify-self: center;
+  width: clamp(18px, 4vw, 34px);
   aspect-ratio: 1;
-  border: 1px solid oklch(0.86 0.02 250 / 0.32);
-  background: oklch(0.98 0 0 / 0.08);
-  animation: pulseCell 4.2s var(--delay) ease-in-out infinite;
+  border: 1px solid oklch(0.9 0.012 250 / 0.42);
+  background: oklch(0.97 0 0 / 0.08);
+  animation: pulseCell 4.8s var(--delay) ease-in-out infinite;
 }
 
-.signal-grid span:nth-child(4n),
-.signal-grid span:nth-child(11n) {
+.signal-map span:nth-child(3n) {
   background: var(--primary);
   border-color: oklch(0.84 0.02 250 / 0.48);
 }
 
-.signal-grid span:nth-child(13n) {
+.signal-map span:nth-child(11n) {
   background: var(--accent);
-}
-
-.signal-panel p {
-  position: absolute;
-  right: 20px;
-  bottom: 18px;
-  left: 20px;
-  margin: 0;
-  color: oklch(0.89 0.012 250);
-  font-size: clamp(1.25rem, 3vw, 2.2rem);
-  font-weight: 760;
-  line-height: 1.05;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
 }
 
 .content-grid {
@@ -317,6 +329,10 @@ footer a:hover {
   padding: 28px 0;
   border-bottom: 1px solid var(--line);
   animation: slideIn 520ms ease-out both;
+  cursor: pointer;
+  transition:
+    background 180ms ease,
+    padding-inline 180ms ease;
 }
 
 .post-row:nth-child(2) {
@@ -340,14 +356,13 @@ footer a:hover {
   text-wrap: balance;
 }
 
-.post-row h3 a {
-  text-decoration-thickness: 1px;
-  text-underline-offset: 5px;
+.post-row:hover h3 {
+  color: var(--primary);
 }
 
-.post-row h3 a:hover {
-  color: var(--primary);
-  text-decoration-line: underline;
+.post-row:hover {
+  background: color-mix(in oklch, var(--surface) 70%, transparent);
+  padding-inline: 10px;
 }
 
 .post-row p {
@@ -392,6 +407,64 @@ footer a:hover {
   transform: translate(2px, -2px);
 }
 
+.post-detail {
+  max-width: 780px;
+  padding: clamp(34px, 7vw, 82px) 0;
+  border-top: 1px solid var(--line);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 26px;
+  color: var(--muted);
+  font-weight: 700;
+  transition: color 180ms ease;
+}
+
+.back-link:hover {
+  color: var(--primary);
+}
+
+.post-detail time {
+  color: var(--primary);
+  font-size: 0.92rem;
+  font-weight: 720;
+}
+
+.post-detail h2 {
+  max-width: 760px;
+  margin: 16px 0 0;
+  font-size: clamp(2.25rem, 6vw, 4.8rem);
+  line-height: 1;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.post-detail-summary {
+  max-width: 68ch;
+  margin: 22px 0 0;
+  color: var(--muted);
+  font-size: clamp(1.05rem, 2vw, 1.22rem);
+  line-height: 1.75;
+}
+
+.post-body {
+  max-width: 70ch;
+  margin-top: 34px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.post-body p {
+  margin: 0 0 20px;
+  color: var(--ink);
+  font-size: 1.04rem;
+  line-height: 1.88;
+  text-wrap: pretty;
+}
+
 .profile-column {
   display: flex;
   flex-direction: column;
@@ -403,9 +476,9 @@ footer a:hover {
 }
 
 .profile-block p:last-child {
-  margin: 18px 0 0;
+  margin: 14px 0 0;
   color: var(--muted);
-  line-height: 1.72;
+  line-height: 1.62;
   text-wrap: pretty;
 }
 
@@ -436,9 +509,14 @@ footer a:hover {
     color 180ms ease;
 }
 
-.topics a:hover {
+.topics a:hover,
+.topics a.is-active {
   border-color: var(--primary);
   color: var(--primary);
+}
+
+.topics a.is-active {
+  background: color-mix(in oklch, var(--primary) 8%, var(--bg));
 }
 
 footer {
@@ -508,7 +586,7 @@ footer a {
   }
 
   .signal-panel {
-    min-height: 330px;
+    min-height: 300px;
   }
 
   .post-row {
@@ -538,8 +616,8 @@ footer a {
     width: 100%;
   }
 
-  .signal-grid {
-    gap: 8px;
+  .signal-map {
+    gap: 12px;
   }
 }
 

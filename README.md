@@ -23,11 +23,10 @@ npm run build
 
 ## 部署到 GitHub Pages
 
-1. 在 GitHub 新建仓库，例如 `asakei-blog` 或 `Asakeii.github.io`。
-2. 推送本项目代码到仓库的 `main` 分支。
-3. 在仓库 Settings → Pages 中选择 GitHub Actions。
-4. 每次推送到 `main` 后，`.github/workflows/deploy.yml` 会自动构建并发布 `dist`。
+当前仓库使用 `gh-pages` 分支发布：
 
-如果仓库名是 `Asakeii.github.io`，发布地址通常是 `https://asakeii.github.io/`。如果仓库名是 `asakei-blog`，发布地址通常是 `https://asakeii.github.io/asakei-blog/`。
+1. 在本地执行 `npm run build`。
+2. 将 `dist` 目录内容推送到远端 `gh-pages` 分支根目录。
+3. 仓库 Settings → Pages 保持 `Deploy from a branch`，分支选择 `gh-pages`，目录选择 `/ (root)`。
 
-项目使用相对资源路径构建，所以两种 GitHub Pages 地址都可以正常加载前端资源。
+当前线上地址是 `https://asakeii.github.io/Blog/`。项目使用相对资源路径构建，所以部署在项目子路径下也可以正常加载前端资源。

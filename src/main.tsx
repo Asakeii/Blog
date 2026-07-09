@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, ArrowUpRight, BookOpen, Github, Sparkles, Tags } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, BookOpen, Github, LayoutDashboard, PenLine, Save, Tags, Trash2 } from "lucide-react";
 import "./styles.css";
 
 type Post = {
@@ -12,9 +12,23 @@ type Post = {
   topics: string[];
   minutes: number;
   body: string[];
+  draft?: boolean;
 };
 
-const posts: Post[] = [
+type RouteState = {
+  page: "home" | "post" | "draft" | "admin";
+  slug: string;
+  topic: string;
+};
+
+type DraftForm = {
+  title: string;
+  summary: string;
+  topic: string;
+  body: string;
+};
+
+const basePosts: Post[] = [
   {
     slug: "executable-notes",
     title: "把复杂问题写成可执行的笔记",
@@ -60,32 +74,114 @@ const posts: Post[] = [
 ];
 
 const topics = ["全部", "前端工程", "AI Agents", "工具构建", "长期写作", "开源实践"];
+const draftsKey = "asakei-blog-drafts";
 
-const getHashState = () => {
+const emptyDraftForm: DraftForm = {
+  title: "",
+  summary: "",
+  topic: "长期写作",
+  body: "",
+};
+
+const getHashState = (): RouteState => {
   const hash = window.location.hash.replace(/^#/, "");
 
   if (hash.startsWith("post/")) {
-    return { postSlug: decodeURIComponent(hash.replace("post/", "")), topic: "全部" };
+    return { page: "post", slug: decodeURIComponent(hash.replace("post/", "")), topic: "全部" };
+  }
+
+  if (hash.startsWith("draft/")) {
+    return { page: "draft", slug: decodeURIComponent(hash.replace("draft/", "")), topic: "全部" };
   }
 
   if (hash.startsWith("topic/")) {
-    return { postSlug: "", topic: decodeURIComponent(hash.replace("topic/", "")) || "全部" };
+    return { page: "home", slug: "", topic: decodeURIComponent(hash.replace("topic/", "")) || "全部" };
   }
 
-  return { postSlug: "", topic: "全部" };
+  if (hash === "admin") {
+    return { page: "admin", slug: "", topic: "全部" };
+  }
+
+  return { page: "home", slug: "", topic: "全部" };
 };
+
+const loadDrafts = (): Post[] => {
+  try {
+    const raw = window.localStorage.getItem(draftsKey);
+    return raw ? (JSON.parse(raw) as Post[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveDrafts = (drafts: Post[]) => {
+  window.localStorage.setItem(draftsKey, JSON.stringify(drafts));
+};
+
+const createSlug = (title: string) =>
+  title
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-|-$/g, "") || `draft-${Date.now()}`;
+
+const today = () => new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()).replaceAll("/", ".");
 
 function App() {
   const [route, setRoute] = useState(getHashState);
-  const selectedPost = posts.find((post) => post.slug === route.postSlug);
+  const [drafts, setDrafts] = useState<Post[]>(loadDrafts);
+  const allPosts = useMemo(() => [...drafts, ...basePosts], [drafts]);
+  const selectedPost = route.page === "post" ? basePosts.find((post) => post.slug === route.slug) : undefined;
+  const selectedDraft = route.page === "draft" ? drafts.find((post) => post.slug === route.slug) : undefined;
+  const activePost = selectedPost || selectedDraft;
 
   const visiblePosts = useMemo(() => {
     if (route.topic === "全部") {
-      return posts;
+      return allPosts;
     }
 
-    return posts.filter((post) => post.topics.includes(route.topic));
-  }, [route.topic]);
+    return allPosts.filter((post) => post.topics.includes(route.topic));
+  }, [allPosts, route.topic]);
+
+  const updateDrafts = (nextDrafts: Post[]) => {
+    setDrafts(nextDrafts);
+    saveDrafts(nextDrafts);
+  };
+
+  const removeDraft = (slug: string) => {
+    const nextDrafts = drafts.filter((draft) => draft.slug !== slug);
+    updateDrafts(nextDrafts);
+    if (route.slug === slug) {
+      window.location.hash = "admin";
+    }
+  };
+
+  const createDraft = (form: DraftForm) => {
+    const title = form.title.trim();
+    const body = form.body
+      .split(/\n+/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+
+    if (!title || body.length === 0) {
+      return;
+    }
+
+    const draft: Post = {
+      slug: `${createSlug(title)}-${Date.now().toString(36)}`,
+      title,
+      date: today(),
+      summary: form.summary.trim() || body[0].slice(0, 72),
+      tags: ["Draft"],
+      topics: [form.topic],
+      minutes: Math.max(1, Math.ceil(body.join("").length / 500)),
+      body,
+      draft: true,
+    };
+
+    updateDrafts([draft, ...drafts]);
+    window.location.hash = `draft/${draft.slug}`;
+  };
 
   useEffect(() => {
     const onHashChange = () => setRoute(getHashState());
@@ -94,120 +190,32 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const targetId = selectedPost ? "post-detail" : route.topic !== "全部" ? "writing" : "";
-    if (targetId) {
-      window.requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block: "start" }));
-    }
-  }, [route.topic, selectedPost]);
+    window.requestAnimationFrame(() => {
+      if (route.page === "home" && window.location.hash === "#writing") {
+        document.getElementById("writing")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+
+      if (route.page === "home" && route.topic !== "全部") {
+        document.getElementById("writing")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [route.page, route.slug, route.topic]);
 
   return (
     <main className="site-shell">
-      <header className="site-header" aria-label="主导航">
-        <a className="brand-mark" href="#top" aria-label="Asakei Blog 首页">
-          <span>A</span>
-          <strong>Asakei</strong>
-        </a>
-        <nav>
-          <a href="#writing">文章</a>
-          <a href="#topics">主题</a>
-          <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer">
-            GitHub
-          </a>
-        </nav>
-        <a className="icon-button" href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 Asakei 的 GitHub">
-          <Github size={18} />
-        </a>
-      </header>
+      <Header />
 
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="section-label">Personal blog / Engineering notes</p>
-          <h1>Asakei 写作的地方。</h1>
-          <p className="hero-lede">记录技术、工具和长期思考。保持简洁、清醒，也保留一点个人偏好。</p>
-          <div className="hero-actions" aria-label="主要操作">
-            <a className="primary-action" href="#writing">
-              开始阅读
-              <ArrowUpRight size={17} />
-            </a>
-            <a className="secondary-action" href="https://github.com/Asakeii" target="_blank" rel="noreferrer">
-              <Github size={17} />
-              GitHub / Asakeii
-            </a>
-          </div>
-        </div>
-
-        <aside className="signal-panel" aria-label="Asakei blog visual signal">
-          <div className="signal-head">
-            <span>asakei.index</span>
-            <Sparkles size={16} />
-          </div>
-          <div className="signal-map" aria-hidden="true">
-            {Array.from({ length: 20 }).map((_, index) => (
-              <span key={index} style={{ "--delay": `${index * 55}ms` } as React.CSSProperties} />
-            ))}
-          </div>
-        </aside>
-      </section>
-
-      {selectedPost ? <PostDetail post={selectedPost} /> : null}
-
-      <section className="content-grid">
-        <div className="writing-column" id="writing">
-          <div className="section-heading">
-            <p className="section-label">{route.topic === "全部" ? "Latest writing" : route.topic}</p>
-            <h2>{route.topic === "全部" ? "近期文章" : "主题文章"}</h2>
-          </div>
-          <div className="post-list">
-            {visiblePosts.map((post) => (
-              <a className="post-row" href={`#post/${post.slug}`} key={post.slug}>
-                <time dateTime={post.date.replaceAll(".", "-")}>{post.date}</time>
-                <div>
-                  <h3>{post.title}</h3>
-                  <p>{post.summary}</p>
-                  <div className="post-meta">
-                    <span>{post.minutes} min read</span>
-                    {post.tags.map((tag) => (
-                      <span key={tag}>{tag}</span>
-                    ))}
-                  </div>
-                </div>
-                <ArrowUpRight className="post-arrow" size={18} aria-hidden="true" />
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <aside className="profile-column" aria-label="博客信息">
-          <div className="profile-block">
-            <p className="section-label">About</p>
-            <h2>安静索引。</h2>
-            <p>工程、工具和写作笔记。短一点，准一点。</p>
-          </div>
-
-          <div className="tool-strip" aria-label="快捷入口">
-            <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 GitHub">
-              <Github size={18} />
-            </a>
-            <a href="#writing" aria-label="查看文章">
-              <BookOpen size={18} />
-            </a>
-            <a href="#topics" aria-label="查看主题">
-              <Tags size={18} />
-            </a>
-          </div>
-
-          <div className="topics" id="topics">
-            <p className="section-label">Topics</p>
-            <div>
-              {topics.map((topic) => (
-                <a className={route.topic === topic ? "is-active" : ""} href={topic === "全部" ? "#writing" : `#topic/${encodeURIComponent(topic)}`} key={topic}>
-                  {topic}
-                </a>
-              ))}
-            </div>
-          </div>
-        </aside>
-      </section>
+      {activePost ? (
+        <PostDetail post={activePost} onDeleteDraft={activePost.draft ? removeDraft : undefined} />
+      ) : route.page === "admin" ? (
+        <AdminPage drafts={drafts} onCreateDraft={createDraft} onDeleteDraft={removeDraft} />
+      ) : (
+        <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} />
+      )}
 
       <footer>
         <span>© 2026 Asakei</span>
@@ -220,18 +228,160 @@ function App() {
   );
 }
 
-function PostDetail({ post }: { post: Post }) {
+function Header() {
   return (
-    <article className="post-detail" id="post-detail">
-      <a className="back-link" href="#writing">
-        <ArrowLeft size={17} />
-        返回文章
+    <header className="site-header" aria-label="主导航">
+      <a className="brand-mark" href="#top" aria-label="Asakei Blog 首页">
+        <span>A</span>
+        <strong>Asakei</strong>
       </a>
+      <nav>
+        <a href="#writing">文章</a>
+        <a href="#topics">主题</a>
+        <a href="#admin">管理</a>
+        <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer">
+          GitHub
+        </a>
+      </nav>
+      <a className="icon-button" href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 Asakei 的 GitHub">
+        <Github size={18} />
+      </a>
+    </header>
+  );
+}
+
+function HomePage({ visiblePosts, selectedTopic }: { visiblePosts: Post[]; selectedTopic: string }) {
+  return (
+    <>
+      <section className="hero" id="top">
+        <div className="hero-copy">
+          <p className="section-label">Personal blog / Engineering notes</p>
+          <h1>Asakei 写作的地方。</h1>
+          <p className="hero-lede">记录技术、工具和长期思考。保持简洁、清醒，也保留一点个人偏好。</p>
+          <div className="hero-actions" aria-label="主要操作">
+            <a className="primary-action" href="#writing">
+              开始阅读
+              <ArrowUpRight size={17} />
+            </a>
+            <a className="secondary-action" href="#admin">
+              <PenLine size={17} />
+              新建博客
+            </a>
+          </div>
+        </div>
+
+        <aside className="studio-panel" aria-label="Asakei blog visual signal">
+          <div className="studio-mark">A</div>
+          <div className="studio-lines" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className="studio-index" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+          </div>
+        </aside>
+      </section>
+
+      <section className="content-grid">
+        <div className="writing-column" id="writing">
+          <div className="section-heading">
+            <p className="section-label">{selectedTopic === "全部" ? "Latest writing" : selectedTopic}</p>
+            <h2>{selectedTopic === "全部" ? "近期文章" : "主题文章"}</h2>
+          </div>
+          <PostList posts={visiblePosts} />
+        </div>
+
+        <AsideInfo selectedTopic={selectedTopic} />
+      </section>
+    </>
+  );
+}
+
+function PostList({ posts }: { posts: Post[] }) {
+  return (
+    <div className="post-list">
+      {posts.map((post) => (
+        <a className="post-row" href={`#${post.draft ? "draft" : "post"}/${post.slug}`} key={post.slug}>
+          <time dateTime={post.date.replaceAll(".", "-")}>{post.date}</time>
+          <div>
+            <h3>{post.title}</h3>
+            <p>{post.summary}</p>
+            <div className="post-meta">
+              <span>{post.draft ? "Draft" : `${post.minutes} min read`}</span>
+              {post.tags.map((tag) => (
+                <span key={tag}>{tag}</span>
+              ))}
+            </div>
+          </div>
+          <ArrowUpRight className="post-arrow" size={18} aria-hidden="true" />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function AsideInfo({ selectedTopic }: { selectedTopic: string }) {
+  return (
+    <aside className="profile-column" aria-label="博客信息">
+      <div className="profile-block">
+        <p className="section-label">About</p>
+        <h2>安静索引。</h2>
+        <p>工程、工具和写作笔记。短一点，准一点。</p>
+      </div>
+
+      <div className="tool-strip" aria-label="快捷入口">
+        <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 GitHub">
+          <Github size={18} />
+        </a>
+        <a href="#admin" aria-label="管理博客">
+          <LayoutDashboard size={18} />
+        </a>
+        <a href="#topics" aria-label="查看主题">
+          <Tags size={18} />
+        </a>
+      </div>
+
+      <div className="topics" id="topics">
+        <p className="section-label">Topics</p>
+        <div>
+          {topics.map((topic) => (
+            <a className={selectedTopic === topic ? "is-active" : ""} href={topic === "全部" ? "#writing" : `#topic/${encodeURIComponent(topic)}`} key={topic}>
+              {topic}
+            </a>
+          ))}
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function PostDetail({ post, onDeleteDraft }: { post: Post; onDeleteDraft?: (slug: string) => void }) {
+  return (
+    <article className="post-detail page-panel" id="post-detail">
+      <div className="detail-topbar">
+        <a className="back-link" href="#writing">
+          <ArrowLeft size={17} />
+          返回文章
+        </a>
+        {onDeleteDraft ? (
+          <button className="text-action danger-action" type="button" onClick={() => onDeleteDraft(post.slug)}>
+            <Trash2 size={16} />
+            删除草稿
+          </button>
+        ) : null}
+      </div>
       <time dateTime={post.date.replaceAll(".", "-")}>{post.date}</time>
       <h2>{post.title}</h2>
       <p className="post-detail-summary">{post.summary}</p>
       <div className="post-meta">
-        <span>{post.minutes} min read</span>
+        <span>{post.draft ? "Draft" : `${post.minutes} min read`}</span>
         {post.tags.map((tag) => (
           <span key={tag}>{tag}</span>
         ))}
@@ -242,6 +392,104 @@ function PostDetail({ post }: { post: Post }) {
         ))}
       </div>
     </article>
+  );
+}
+
+function AdminPage({ drafts, onCreateDraft, onDeleteDraft }: { drafts: Post[]; onCreateDraft: (form: DraftForm) => void; onDeleteDraft: (slug: string) => void }) {
+  const [form, setForm] = useState<DraftForm>(emptyDraftForm);
+  const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
+
+  const updateForm = (key: keyof DraftForm, value: string) => {
+    setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  return (
+    <section className="admin-page page-panel" id="admin">
+      <div className="admin-heading">
+        <p className="section-label">Blog admin</p>
+        <h1>管理博客</h1>
+      </div>
+
+      <div className="admin-grid">
+        <form
+          className="editor-panel"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (canSave) {
+              onCreateDraft(form);
+              setForm(emptyDraftForm);
+            }
+          }}
+        >
+          <label>
+            标题
+            <input value={form.title} onChange={(event) => updateForm("title", event.target.value)} placeholder="新的博客标题" />
+          </label>
+          <label>
+            摘要
+            <input value={form.summary} onChange={(event) => updateForm("summary", event.target.value)} placeholder="一句话摘要" />
+          </label>
+          <label>
+            主题
+            <select value={form.topic} onChange={(event) => updateForm("topic", event.target.value)}>
+              {topics
+                .filter((topic) => topic !== "全部")
+                .map((topic) => (
+                  <option key={topic} value={topic}>
+                    {topic}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            正文
+            <textarea value={form.body} onChange={(event) => updateForm("body", event.target.value)} placeholder="用空行分段" rows={8} />
+          </label>
+          <div className="form-actions">
+            <button className="primary-action" type="submit" disabled={!canSave}>
+              <Save size={17} />
+              保存草稿
+            </button>
+            <button className="secondary-action" type="button" onClick={() => setForm(emptyDraftForm)}>
+              清空
+            </button>
+          </div>
+        </form>
+
+        <div className="manage-panel">
+          <div className="manage-section">
+            <h2>草稿</h2>
+            {drafts.length > 0 ? (
+              drafts.map((draft) => (
+                <div className="manage-row" key={draft.slug}>
+                  <a href={`#draft/${draft.slug}`}>
+                    <span>{draft.date}</span>
+                    {draft.title}
+                  </a>
+                  <button type="button" aria-label={`删除 ${draft.title}`} onClick={() => onDeleteDraft(draft.slug)}>
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="empty-copy">暂无草稿</p>
+            )}
+          </div>
+
+          <div className="manage-section">
+            <h2>已发布</h2>
+            {basePosts.map((post) => (
+              <div className="manage-row" key={post.slug}>
+                <a href={`#post/${post.slug}`}>
+                  <span>{post.date}</span>
+                  {post.title}
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

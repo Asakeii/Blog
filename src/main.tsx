@@ -463,9 +463,10 @@ function AdminPage({
   publishedPosts: Post[];
 }) {
   const [form, setForm] = useState<DraftForm>(emptyDraftForm);
+  const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
   const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
-  const previewMarkdown = form.body.trim() || "开始写作后，这里会实时预览 Markdown。";
+  const previewMarkdown = form.body.trim() || "点击“编辑 Markdown”开始写作。";
 
   const updateForm = (key: keyof DraftForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -473,10 +474,17 @@ function AdminPage({
 
   const resetForm = () => {
     setForm(emptyDraftForm);
+    setIsEditingMarkdown(false);
     if (editorRef.current) {
       editorRef.current.innerText = emptyDraftForm.body;
     }
   };
+
+  useEffect(() => {
+    if (isEditingMarkdown && editorRef.current && editorRef.current.innerText !== form.body) {
+      editorRef.current.innerText = form.body;
+    }
+  }, [isEditingMarkdown]);
 
   return (
     <section className="admin-page page-panel" id="admin">
@@ -519,28 +527,31 @@ function AdminPage({
             </label>
           </div>
 
-          <div className="writer-split">
-            <section className="writer-pane" aria-label="Markdown 写作区">
-              <div className="pane-title">Markdown</div>
-              <div
-                className="markdown-editor"
-                contentEditable
-                data-placeholder="用 Markdown 写下你的博客..."
-                onInput={(event) => updateForm("body", event.currentTarget.innerText)}
-                ref={editorRef}
-                role="textbox"
-                spellCheck={false}
-                suppressContentEditableWarning
-              >
-                {emptyDraftForm.body}
-              </div>
-            </section>
-            <section className="preview-pane" aria-label="Markdown 实时预览">
-              <div className="pane-title">Preview</div>
-              <div className="preview-surface">
-                <MarkdownContent markdown={previewMarkdown} />
-              </div>
-            </section>
+          <div className="markdown-canvas">
+            <div className="canvas-toolbar">
+              <span>{isEditingMarkdown ? "Markdown source" : "Rendered markdown"}</span>
+              <button type="button" onClick={() => setIsEditingMarkdown((editing) => !editing)}>
+                {isEditingMarkdown ? "渲染预览" : "编辑 Markdown"}
+              </button>
+            </div>
+            <div className="canvas-surface">
+              {isEditingMarkdown ? (
+                <div
+                  className="markdown-editor"
+                  contentEditable
+                  data-placeholder="用 Markdown 写下你的博客..."
+                  onInput={(event) => updateForm("body", event.currentTarget.innerText)}
+                  ref={editorRef}
+                  role="textbox"
+                  spellCheck={false}
+                  suppressContentEditableWarning
+                />
+              ) : (
+                <button className="rendered-markdown-button" type="button" onClick={() => setIsEditingMarkdown(true)}>
+                  <MarkdownContent markdown={previewMarkdown} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="form-actions">

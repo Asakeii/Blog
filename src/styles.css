@@ -715,47 +715,58 @@ footer a:hover {
   color: oklch(0.38 0.025 250);
 }
 
-.writer-split {
+.markdown-canvas {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  min-height: min(72vh, 760px);
+  min-height: min(74vh, 780px);
+  grid-template-rows: 46px minmax(0, 1fr);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 
-.writer-pane,
-.preview-pane {
-  display: grid;
-  grid-template-rows: 44px minmax(0, 1fr);
-  min-width: 0;
-}
-
-.writer-pane {
-  border-right: 1px solid var(--line);
-}
-
-.pane-title {
+.canvas-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   border-bottom: 1px solid var(--line);
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 760;
 }
 
-.writer-pane .pane-title,
-.markdown-editor {
+.canvas-toolbar button {
+  border: 1px solid var(--line);
+  padding: 7px 10px;
+  color: var(--ink);
+  background: var(--bg);
+  font: inherit;
+  font-weight: 760;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.canvas-toolbar button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.canvas-surface {
+  overflow: hidden;
+  min-height: 0;
+  background: color-mix(in oklch, var(--surface) 62%, var(--bg));
+}
+
+.canvas-toolbar,
+.markdown-editor,
+.rendered-markdown-button {
   padding-left: clamp(16px, 3vw, 28px);
   padding-right: clamp(16px, 3vw, 28px);
 }
 
-.preview-pane .pane-title,
-.preview-surface {
-  padding-left: clamp(16px, 3vw, 28px);
-  padding-right: clamp(16px, 3vw, 28px);
-}
-
 .markdown-editor {
+  min-height: 100%;
   overflow: auto;
   padding-top: 24px;
   padding-bottom: 38px;
@@ -777,11 +788,19 @@ footer a:hover {
   color: var(--muted);
 }
 
-.preview-surface {
+.rendered-markdown-button {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  overflow: auto;
+  border: 0;
   overflow: auto;
   padding-top: 24px;
   padding-bottom: 38px;
-  background: color-mix(in oklch, var(--surface) 62%, var(--bg));
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: text;
 }
 
 .markdown-body {
@@ -1039,22 +1058,11 @@ footer a {
   }
 
   .editor-toolbar,
-  .manage-panel,
-  .writer-split {
+  .manage-panel {
     grid-template-columns: 1fr;
   }
 
-  .writer-split {
-    min-height: auto;
-  }
-
-  .writer-pane {
-    min-height: 58vh;
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .preview-pane {
+  .markdown-canvas {
     min-height: 58vh;
   }
 

@@ -655,33 +655,33 @@ footer a:hover {
 }
 
 .admin-heading {
-  max-width: 700px;
-  margin-bottom: clamp(28px, 5vw, 54px);
+  max-width: 760px;
+  margin-bottom: clamp(20px, 3vw, 34px);
 }
 
 .admin-heading h1 {
   margin: 0;
-  font-size: clamp(2.6rem, 7vw, 5.2rem);
-  line-height: 0.95;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.2rem, 5vw, 4.3rem);
+  line-height: 0.98;
+  letter-spacing: 0;
 }
 
 .writing-workbench {
-  width: min(1480px, calc(100vw - 36px));
+  width: min(1420px, calc(100vw - 36px));
   margin-left: 50%;
   transform: translateX(-50%);
 }
 
 .editor-panel {
   display: grid;
-  gap: 16px;
+  gap: 14px;
   border-top: 1px solid var(--ink);
-  padding-top: 20px;
+  padding-top: 16px;
 }
 
 .editor-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, 1.2fr) minmax(220px, 1fr) minmax(160px, 220px);
+  grid-template-columns: minmax(220px, 1.1fr) minmax(220px, 1fr) minmax(150px, 190px) minmax(200px, 260px);
   gap: 12px;
 }
 
@@ -715,12 +715,41 @@ footer a:hover {
   color: oklch(0.38 0.025 250);
 }
 
-.markdown-canvas {
+.topic-composer {
   display: grid;
-  min-height: min(74vh, 780px);
+  grid-template-columns: 1fr 40px;
+  align-items: end;
+  gap: 8px;
+}
+
+.topic-composer button {
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--bg);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.topic-composer button:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.live-markdown-canvas {
+  display: grid;
+  min-height: min(72vh, 760px);
   grid-template-rows: 46px minmax(0, 1fr);
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+  background: color-mix(in oklch, var(--surface) 70%, var(--bg));
 }
 
 .canvas-toolbar {
@@ -734,42 +763,40 @@ footer a:hover {
   font-weight: 760;
 }
 
-.canvas-toolbar button {
-  border: 1px solid var(--line);
-  padding: 7px 10px;
-  color: var(--ink);
-  background: var(--bg);
-  font: inherit;
-  font-weight: 760;
-  cursor: pointer;
-  transition:
-    border-color 180ms ease,
-    color 180ms ease;
-}
-
-.canvas-toolbar button:hover {
-  border-color: var(--primary);
-  color: var(--primary);
-}
-
-.canvas-surface {
-  overflow: hidden;
+.live-canvas-surface {
+  display: grid;
+  overflow: auto;
   min-height: 0;
-  background: color-mix(in oklch, var(--surface) 62%, var(--bg));
+  background:
+    linear-gradient(90deg, color-mix(in oklch, var(--line) 40%, transparent) 1px, transparent 1px) 0 0 / 48px 48px,
+    linear-gradient(color-mix(in oklch, var(--line) 32%, transparent) 1px, transparent 1px) 0 0 / 48px 48px,
+    color-mix(in oklch, var(--surface) 68%, var(--bg));
 }
 
 .canvas-toolbar,
-.markdown-editor,
-.rendered-markdown-button {
+.rendered-layer,
+.markdown-editor {
   padding-left: clamp(16px, 3vw, 28px);
   padding-right: clamp(16px, 3vw, 28px);
 }
 
+.rendered-layer,
 .markdown-editor {
+  grid-area: 1 / 1;
   min-height: 100%;
-  overflow: auto;
   padding-top: 24px;
   padding-bottom: 38px;
+}
+
+.rendered-layer {
+  pointer-events: none;
+}
+
+.rendered-layer .markdown-body {
+  padding-bottom: 16vh;
+}
+
+.markdown-editor {
   color: var(--ink);
   font:
     1.02rem/1.85 ui-monospace,
@@ -783,24 +810,25 @@ footer a:hover {
   outline: 0;
 }
 
+.live-source {
+  caret-color: var(--primary);
+  color: transparent;
+  background: transparent;
+  text-shadow: 0 0 0 transparent;
+}
+
+.live-source::selection {
+  background: color-mix(in oklch, var(--primary) 24%, transparent);
+  color: transparent;
+}
+
 .markdown-editor:empty::before {
   content: attr(data-placeholder);
   color: var(--muted);
 }
 
-.rendered-markdown-button {
-  display: block;
-  width: 100%;
-  min-height: 100%;
-  overflow: auto;
-  border: 0;
-  overflow: auto;
-  padding-top: 24px;
-  padding-bottom: 38px;
-  color: inherit;
-  background: transparent;
-  text-align: left;
-  cursor: text;
+.live-source:empty::before {
+  color: transparent;
 }
 
 .markdown-body {
@@ -813,7 +841,7 @@ footer a:hover {
 .markdown-body h3 {
   margin: 0 0 0.7em;
   line-height: 1.08;
-  letter-spacing: -0.025em;
+  letter-spacing: 0;
   text-wrap: balance;
 }
 
@@ -1062,7 +1090,7 @@ footer a {
     grid-template-columns: 1fr;
   }
 
-  .markdown-canvas {
+  .live-markdown-canvas {
     min-height: 58vh;
   }
 

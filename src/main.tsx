@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, ArrowUpRight, Github, LayoutDashboard, PenLine, Save, Tags, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Github, LayoutDashboard, PenLine, Plus, Save, Tags, Trash2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import "./styles.css";
@@ -76,9 +76,10 @@ const basePosts: Post[] = [
   },
 ];
 
-const topics = ["全部", "前端工程", "AI Agents", "工具构建", "长期写作", "开源实践"];
+const defaultTopics = ["全部", "前端工程", "AI Agents", "工具构建", "长期写作", "开源实践"];
 const draftsKey = "asakei-blog-drafts";
 const deletedPostsKey = "asakei-blog-deleted-posts";
+const customTopicsKey = "asakei-blog-custom-topics";
 
 const emptyDraftForm: DraftForm = {
   title: "",
@@ -135,6 +136,21 @@ const saveDeletedPostSlugs = (slugs: string[]) => {
   window.localStorage.setItem(deletedPostsKey, JSON.stringify(slugs));
 };
 
+const uniqueTopics = (items: string[]) => Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
+
+const loadCustomTopics = (): string[] => {
+  try {
+    const raw = window.localStorage.getItem(customTopicsKey);
+    return raw ? uniqueTopics(JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCustomTopics = (items: string[]) => {
+  window.localStorage.setItem(customTopicsKey, JSON.stringify(items));
+};
+
 const renderMarkdown = (markdown: string) => DOMPurify.sanitize(marked.parse(markdown, { async: false }) as string);
 
 const createSlug = (title: string) =>
@@ -150,9 +166,14 @@ function App() {
   const [route, setRoute] = useState(getHashState);
   const [drafts, setDrafts] = useState<Post[]>(loadDrafts);
   const [deletedPostSlugs, setDeletedPostSlugs] = useState<string[]>(loadDeletedPostSlugs);
+  const [customTopics, setCustomTopics] = useState<string[]>(loadCustomTopics);
   const publishedPosts = useMemo(() => basePosts.filter((post) => !deletedPostSlugs.includes(post.slug)), [deletedPostSlugs]);
   const deletedPosts = useMemo(() => basePosts.filter((post) => deletedPostSlugs.includes(post.slug)), [deletedPostSlugs]);
   const allPosts = useMemo(() => [...drafts, ...publishedPosts], [drafts, publishedPosts]);
+  const allTopics = useMemo(
+    () => ["全部", ...uniqueTopics([...defaultTopics.filter((topic) => topic !== "全部"), ...customTopics, ...allPosts.flatMap((post) => post.topics)])],
+    [allPosts, customTopics],
+  );
   const selectedPost = route.page === "post" ? publishedPosts.find((post) => post.slug === route.slug) : undefined;
   const selectedDraft = route.page === "draft" ? drafts.find((post) => post.slug === route.slug) : undefined;
   const activePost = selectedPost || selectedDraft;
@@ -168,6 +189,18 @@ function App() {
   const updateDrafts = (nextDrafts: Post[]) => {
     setDrafts(nextDrafts);
     saveDrafts(nextDrafts);
+  };
+
+  const addTopic = (topic: string) => {
+    const nextTopic = topic.trim();
+
+    if (!nextTopic || allTopics.includes(nextTopic)) {
+      return;
+    }
+
+    const nextTopics = uniqueTopics([...customTopics, nextTopic]);
+    setCustomTopics(nextTopics);
+    saveCustomTopics(nextTopics);
   };
 
   const removeDraft = (slug: string) => {
@@ -254,14 +287,16 @@ function App() {
         <AdminPage
           deletedPosts={deletedPosts}
           drafts={drafts}
+          onAddTopic={addTopic}
           onCreateDraft={createDraft}
           onDeleteDraft={removeDraft}
           onDeletePublishedPost={removePublishedPost}
           onRestorePublishedPost={restorePublishedPost}
           publishedPosts={publishedPosts}
+          topics={allTopics}
         />
       ) : (
-        <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} />
+        <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} topics={allTopics} />
       )}
 
       <footer>
@@ -297,7 +332,7 @@ function Header() {
   );
 }
 
-function HomePage({ visiblePosts, selectedTopic }: { visiblePosts: Post[]; selectedTopic: string }) {
+function HomePage({ visiblePosts, selectedTopic, topics }: { visiblePosts: Post[]; selectedTopic: string; topics: string[] }) {
   return (
     <>
       <section className="hero" id="top">
@@ -345,7 +380,7 @@ function HomePage({ visiblePosts, selectedTopic }: { visiblePosts: Post[]; selec
           <PostList posts={visiblePosts} />
         </div>
 
-        <AsideInfo selectedTopic={selectedTopic} />
+        <AsideInfo selectedTopic={selectedTopic} topics={topics} />
       </section>
     </>
   );
@@ -374,7 +409,7 @@ function PostList({ posts }: { posts: Post[] }) {
   );
 }
 
-function AsideInfo({ selectedTopic }: { selectedTopic: string }) {
+function AsideInfo({ selectedTopic, topics }: { selectedTopic: string; topics: string[] }) {
   return (
     <aside className="profile-column" aria-label="博客信息">
       <div className="profile-block">
@@ -448,25 +483,29 @@ function MarkdownContent({ markdown }: { markdown: string }) {
 function AdminPage({
   deletedPosts,
   drafts,
+  onAddTopic,
   onCreateDraft,
   onDeleteDraft,
   onDeletePublishedPost,
   onRestorePublishedPost,
   publishedPosts,
+  topics,
 }: {
   deletedPosts: Post[];
   drafts: Post[];
+  onAddTopic: (topic: string) => void;
   onCreateDraft: (form: DraftForm) => void;
   onDeleteDraft: (slug: string) => void;
   onDeletePublishedPost: (slug: string) => void;
   onRestorePublishedPost: (slug: string) => void;
   publishedPosts: Post[];
+  topics: string[];
 }) {
   const [form, setForm] = useState<DraftForm>(emptyDraftForm);
-  const [isEditingMarkdown, setIsEditingMarkdown] = useState(false);
+  const [newTopic, setNewTopic] = useState("");
   const editorRef = useRef<HTMLDivElement>(null);
   const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
-  const previewMarkdown = form.body.trim() || "点击“编辑 Markdown”开始写作。";
+  const previewMarkdown = form.body.trim() || "# 从这里开始写\n\n输入 Markdown 时，画布会直接同步成文章样式。";
 
   const updateForm = (key: keyof DraftForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -474,23 +513,35 @@ function AdminPage({
 
   const resetForm = () => {
     setForm(emptyDraftForm);
-    setIsEditingMarkdown(false);
+    setNewTopic("");
     if (editorRef.current) {
       editorRef.current.innerText = emptyDraftForm.body;
     }
   };
 
-  useEffect(() => {
-    if (isEditingMarkdown && editorRef.current && editorRef.current.innerText !== form.body) {
-      editorRef.current.innerText = form.body;
+  const addTopicFromInput = () => {
+    const nextTopic = newTopic.trim();
+
+    if (!nextTopic) {
+      return;
     }
-  }, [isEditingMarkdown]);
+
+    onAddTopic(nextTopic);
+    updateForm("topic", nextTopic);
+    setNewTopic("");
+  };
+
+  useEffect(() => {
+    if (editorRef.current && !editorRef.current.innerText) {
+      editorRef.current.innerText = emptyDraftForm.body;
+    }
+  }, []);
 
   return (
     <section className="admin-page page-panel" id="admin">
       <div className="admin-heading">
         <p className="section-label">Blog admin</p>
-        <h1>管理博客</h1>
+        <h1>写新的博客</h1>
       </div>
 
       <div className="writing-workbench">
@@ -525,32 +576,46 @@ function AdminPage({
                   ))}
               </select>
             </label>
+            <label>
+              <span>新主题</span>
+              <div className="topic-composer">
+                <input
+                  value={newTopic}
+                  onChange={(event) => setNewTopic(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addTopicFromInput();
+                    }
+                  }}
+                  placeholder="例如：系统设计"
+                />
+                <button type="button" aria-label="新增主题" onClick={addTopicFromInput}>
+                  <Plus size={16} />
+                </button>
+              </div>
+            </label>
           </div>
 
-          <div className="markdown-canvas">
+          <div className="live-markdown-canvas">
             <div className="canvas-toolbar">
-              <span>{isEditingMarkdown ? "Markdown source" : "Rendered markdown"}</span>
-              <button type="button" onClick={() => setIsEditingMarkdown((editing) => !editing)}>
-                {isEditingMarkdown ? "渲染预览" : "编辑 Markdown"}
-              </button>
+              <span>Live markdown</span>
+              <span>实时渲染</span>
             </div>
-            <div className="canvas-surface">
-              {isEditingMarkdown ? (
-                <div
-                  className="markdown-editor"
-                  contentEditable
-                  data-placeholder="用 Markdown 写下你的博客..."
-                  onInput={(event) => updateForm("body", event.currentTarget.innerText)}
-                  ref={editorRef}
-                  role="textbox"
-                  spellCheck={false}
-                  suppressContentEditableWarning
-                />
-              ) : (
-                <button className="rendered-markdown-button" type="button" onClick={() => setIsEditingMarkdown(true)}>
-                  <MarkdownContent markdown={previewMarkdown} />
-                </button>
-              )}
+            <div className="live-canvas-surface">
+              <div className="rendered-layer" aria-hidden="true">
+                <MarkdownContent markdown={previewMarkdown} />
+              </div>
+              <div
+                className="markdown-editor live-source"
+                contentEditable
+                data-placeholder="用 Markdown 写下你的博客..."
+                onInput={(event) => updateForm("body", event.currentTarget.innerText)}
+                ref={editorRef}
+                role="textbox"
+                spellCheck={false}
+                suppressContentEditableWarning
+              />
             </div>
           </div>
 

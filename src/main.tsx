@@ -232,7 +232,7 @@ function Header() {
   return (
     <header className="site-header" aria-label="主导航">
       <a className="brand-mark" href="#top" aria-label="Asakei Blog 首页">
-        <span>A</span>
+        <img className="logo-mark" src="./asakei-logo.svg" alt="" aria-hidden="true" />
         <strong>Asakei</strong>
       </a>
       <nav>

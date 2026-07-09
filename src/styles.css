@@ -80,15 +80,10 @@ button:focus-visible {
   font-size: 0.98rem;
 }
 
-.brand-mark span {
-  display: grid;
-  place-items: center;
+.logo-mark {
   width: 34px;
   aspect-ratio: 1;
-  border: 1px solid var(--ink);
-  color: var(--bg);
-  background: var(--ink);
-  font-weight: 760;
+  display: block;
 }
 
 .brand-mark strong {

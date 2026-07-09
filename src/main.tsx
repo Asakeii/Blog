@@ -1,6 +1,8 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, ArrowUpRight, BookOpen, Github, LayoutDashboard, PenLine, Save, Tags, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Github, LayoutDashboard, PenLine, Save, Tags, Trash2 } from "lucide-react";
+import DOMPurify from "dompurify";
+import { marked } from "marked";
 import "./styles.css";
 
 type Post = {
@@ -12,6 +14,7 @@ type Post = {
   topics: string[];
   minutes: number;
   body: string[];
+  markdown?: string;
   draft?: boolean;
 };
 
@@ -75,12 +78,13 @@ const basePosts: Post[] = [
 
 const topics = ["全部", "前端工程", "AI Agents", "工具构建", "长期写作", "开源实践"];
 const draftsKey = "asakei-blog-drafts";
+const deletedPostsKey = "asakei-blog-deleted-posts";
 
 const emptyDraftForm: DraftForm = {
   title: "",
   summary: "",
   topic: "长期写作",
-  body: "",
+  body: "# 新的博客\n\n从这里开始写 Markdown。\n\n- 支持列表\n- 支持 **加粗** 和链接\n\n```ts\nconst idea = \"Asakei\";\n```",
 };
 
 const getHashState = (): RouteState => {
@@ -118,6 +122,21 @@ const saveDrafts = (drafts: Post[]) => {
   window.localStorage.setItem(draftsKey, JSON.stringify(drafts));
 };
 
+const loadDeletedPostSlugs = (): string[] => {
+  try {
+    const raw = window.localStorage.getItem(deletedPostsKey);
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveDeletedPostSlugs = (slugs: string[]) => {
+  window.localStorage.setItem(deletedPostsKey, JSON.stringify(slugs));
+};
+
+const renderMarkdown = (markdown: string) => DOMPurify.sanitize(marked.parse(markdown, { async: false }) as string);
+
 const createSlug = (title: string) =>
   title
     .trim()
@@ -130,8 +149,11 @@ const today = () => new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "
 function App() {
   const [route, setRoute] = useState(getHashState);
   const [drafts, setDrafts] = useState<Post[]>(loadDrafts);
-  const allPosts = useMemo(() => [...drafts, ...basePosts], [drafts]);
-  const selectedPost = route.page === "post" ? basePosts.find((post) => post.slug === route.slug) : undefined;
+  const [deletedPostSlugs, setDeletedPostSlugs] = useState<string[]>(loadDeletedPostSlugs);
+  const publishedPosts = useMemo(() => basePosts.filter((post) => !deletedPostSlugs.includes(post.slug)), [deletedPostSlugs]);
+  const deletedPosts = useMemo(() => basePosts.filter((post) => deletedPostSlugs.includes(post.slug)), [deletedPostSlugs]);
+  const allPosts = useMemo(() => [...drafts, ...publishedPosts], [drafts, publishedPosts]);
+  const selectedPost = route.page === "post" ? publishedPosts.find((post) => post.slug === route.slug) : undefined;
   const selectedDraft = route.page === "draft" ? drafts.find((post) => post.slug === route.slug) : undefined;
   const activePost = selectedPost || selectedDraft;
 
@@ -156,10 +178,26 @@ function App() {
     }
   };
 
+  const removePublishedPost = (slug: string) => {
+    const nextSlugs = Array.from(new Set([...deletedPostSlugs, slug]));
+    setDeletedPostSlugs(nextSlugs);
+    saveDeletedPostSlugs(nextSlugs);
+    if (route.slug === slug) {
+      window.location.hash = "admin";
+    }
+  };
+
+  const restorePublishedPost = (slug: string) => {
+    const nextSlugs = deletedPostSlugs.filter((deletedSlug) => deletedSlug !== slug);
+    setDeletedPostSlugs(nextSlugs);
+    saveDeletedPostSlugs(nextSlugs);
+  };
+
   const createDraft = (form: DraftForm) => {
     const title = form.title.trim();
-    const body = form.body
-      .split(/\n+/)
+    const markdown = form.body.trim();
+    const body = markdown
+      .split(/\n{2,}/)
       .map((paragraph) => paragraph.trim())
       .filter(Boolean);
 
@@ -176,6 +214,7 @@ function App() {
       topics: [form.topic],
       minutes: Math.max(1, Math.ceil(body.join("").length / 500)),
       body,
+      markdown,
       draft: true,
     };
 
@@ -212,7 +251,15 @@ function App() {
       {activePost ? (
         <PostDetail post={activePost} onDeleteDraft={activePost.draft ? removeDraft : undefined} />
       ) : route.page === "admin" ? (
-        <AdminPage drafts={drafts} onCreateDraft={createDraft} onDeleteDraft={removeDraft} />
+        <AdminPage
+          deletedPosts={deletedPosts}
+          drafts={drafts}
+          onCreateDraft={createDraft}
+          onDeleteDraft={removeDraft}
+          onDeletePublishedPost={removePublishedPost}
+          onRestorePublishedPost={restorePublishedPost}
+          publishedPosts={publishedPosts}
+        />
       ) : (
         <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} />
       )}
@@ -387,20 +434,48 @@ function PostDetail({ post, onDeleteDraft }: { post: Post; onDeleteDraft?: (slug
         ))}
       </div>
       <div className="post-body">
-        {post.body.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
-        ))}
+        {post.markdown ? <MarkdownContent markdown={post.markdown} /> : post.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
       </div>
     </article>
   );
 }
 
-function AdminPage({ drafts, onCreateDraft, onDeleteDraft }: { drafts: Post[]; onCreateDraft: (form: DraftForm) => void; onDeleteDraft: (slug: string) => void }) {
+function MarkdownContent({ markdown }: { markdown: string }) {
+  const html = useMemo(() => renderMarkdown(markdown), [markdown]);
+  return <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+function AdminPage({
+  deletedPosts,
+  drafts,
+  onCreateDraft,
+  onDeleteDraft,
+  onDeletePublishedPost,
+  onRestorePublishedPost,
+  publishedPosts,
+}: {
+  deletedPosts: Post[];
+  drafts: Post[];
+  onCreateDraft: (form: DraftForm) => void;
+  onDeleteDraft: (slug: string) => void;
+  onDeletePublishedPost: (slug: string) => void;
+  onRestorePublishedPost: (slug: string) => void;
+  publishedPosts: Post[];
+}) {
   const [form, setForm] = useState<DraftForm>(emptyDraftForm);
+  const editorRef = useRef<HTMLDivElement>(null);
   const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
+  const previewMarkdown = form.body.trim() || "开始写作后，这里会实时预览 Markdown。";
 
   const updateForm = (key: keyof DraftForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const resetForm = () => {
+    setForm(emptyDraftForm);
+    if (editorRef.current) {
+      editorRef.current.innerText = emptyDraftForm.body;
+    }
   };
 
   return (
@@ -410,47 +485,70 @@ function AdminPage({ drafts, onCreateDraft, onDeleteDraft }: { drafts: Post[]; o
         <h1>管理博客</h1>
       </div>
 
-      <div className="admin-grid">
+      <div className="writing-workbench">
         <form
           className="editor-panel"
           onSubmit={(event) => {
             event.preventDefault();
             if (canSave) {
               onCreateDraft(form);
-              setForm(emptyDraftForm);
+              resetForm();
             }
           }}
         >
-          <label>
-            标题
-            <input value={form.title} onChange={(event) => updateForm("title", event.target.value)} placeholder="新的博客标题" />
-          </label>
-          <label>
-            摘要
-            <input value={form.summary} onChange={(event) => updateForm("summary", event.target.value)} placeholder="一句话摘要" />
-          </label>
-          <label>
-            主题
-            <select value={form.topic} onChange={(event) => updateForm("topic", event.target.value)}>
-              {topics
-                .filter((topic) => topic !== "全部")
-                .map((topic) => (
-                  <option key={topic} value={topic}>
-                    {topic}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <label>
-            正文
-            <textarea value={form.body} onChange={(event) => updateForm("body", event.target.value)} placeholder="用空行分段" rows={8} />
-          </label>
+          <div className="editor-toolbar">
+            <label>
+              <span>标题</span>
+              <input value={form.title} onChange={(event) => updateForm("title", event.target.value)} placeholder="新的博客标题" />
+            </label>
+            <label>
+              <span>摘要</span>
+              <input value={form.summary} onChange={(event) => updateForm("summary", event.target.value)} placeholder="一句话摘要" />
+            </label>
+            <label>
+              <span>主题</span>
+              <select value={form.topic} onChange={(event) => updateForm("topic", event.target.value)}>
+                {topics
+                  .filter((topic) => topic !== "全部")
+                  .map((topic) => (
+                    <option key={topic} value={topic}>
+                      {topic}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="writer-split">
+            <section className="writer-pane" aria-label="Markdown 写作区">
+              <div className="pane-title">Markdown</div>
+              <div
+                className="markdown-editor"
+                contentEditable
+                data-placeholder="用 Markdown 写下你的博客..."
+                onInput={(event) => updateForm("body", event.currentTarget.innerText)}
+                ref={editorRef}
+                role="textbox"
+                spellCheck={false}
+                suppressContentEditableWarning
+              >
+                {emptyDraftForm.body}
+              </div>
+            </section>
+            <section className="preview-pane" aria-label="Markdown 实时预览">
+              <div className="pane-title">Preview</div>
+              <div className="preview-surface">
+                <MarkdownContent markdown={previewMarkdown} />
+              </div>
+            </section>
+          </div>
+
           <div className="form-actions">
             <button className="primary-action" type="submit" disabled={!canSave}>
               <Save size={17} />
               保存草稿
             </button>
-            <button className="secondary-action" type="button" onClick={() => setForm(emptyDraftForm)}>
+            <button className="secondary-action" type="button" onClick={resetForm}>
               清空
             </button>
           </div>
@@ -478,14 +576,37 @@ function AdminPage({ drafts, onCreateDraft, onDeleteDraft }: { drafts: Post[]; o
 
           <div className="manage-section">
             <h2>已发布</h2>
-            {basePosts.map((post) => (
+            {publishedPosts.map((post) => (
               <div className="manage-row" key={post.slug}>
                 <a href={`#post/${post.slug}`}>
                   <span>{post.date}</span>
                   {post.title}
                 </a>
+                <button type="button" aria-label={`删除 ${post.title}`} onClick={() => onDeletePublishedPost(post.slug)}>
+                  <Trash2 size={16} />
+                </button>
               </div>
             ))}
+            {publishedPosts.length === 0 ? <p className="empty-copy">暂无已发布文章</p> : null}
+          </div>
+
+          <div className="manage-section">
+            <h2>已删除</h2>
+            {deletedPosts.length > 0 ? (
+              deletedPosts.map((post) => (
+                <div className="manage-row restore-row" key={post.slug}>
+                  <span>
+                    <span>{post.date}</span>
+                    {post.title}
+                  </span>
+                  <button type="button" onClick={() => onRestorePublishedPost(post.slug)}>
+                    恢复
+                  </button>
+                </div>
+              ))
+            ) : (
+              <p className="empty-copy">暂无删除记录</p>
+            )}
           </div>
         </div>
       </div>

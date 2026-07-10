@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowLeft, ArrowUpRight, Github, LayoutDashboard, PenLine, Plus, Save, Tags, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import "./styles.css";
@@ -296,15 +296,11 @@ function App() {
           topics={allTopics}
         />
       ) : (
-        <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} topics={allTopics} />
+        <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} />
       )}
 
       <footer>
         <span>© 2026 Asakei</span>
-        <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer">
-          Published from GitHub
-          <ArrowUpRight size={15} />
-        </a>
       </footer>
     </main>
   );
@@ -319,68 +315,27 @@ function Header() {
       </a>
       <nav>
         <a href="#writing">文章</a>
-        <a href="#topics">主题</a>
-        <a href="#admin">管理</a>
-        <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer">
-          GitHub
-        </a>
+        <a href="#admin">写作</a>
       </nav>
-      <a className="icon-button" href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 Asakei 的 GitHub">
-        <Github size={18} />
-      </a>
     </header>
   );
 }
 
-function HomePage({ visiblePosts, selectedTopic, topics }: { visiblePosts: Post[]; selectedTopic: string; topics: string[] }) {
+function HomePage({ visiblePosts, selectedTopic }: { visiblePosts: Post[]; selectedTopic: string }) {
   return (
     <>
-      <section className="hero" id="top">
-        <div className="hero-copy">
-          <p className="section-label">Personal blog / Engineering notes</p>
-          <h1>Asakei 写作的地方。</h1>
-          <p className="hero-lede">记录技术、工具和长期思考。保持简洁、清醒，也保留一点个人偏好。</p>
-          <div className="hero-actions" aria-label="主要操作">
-            <a className="primary-action" href="#writing">
-              开始阅读
-              <ArrowUpRight size={17} />
-            </a>
-            <a className="secondary-action" href="#admin">
-              <PenLine size={17} />
-              新建博客
-            </a>
-          </div>
-        </div>
-
-        <aside className="studio-panel" aria-label="Asakei blog visual signal">
-          <div className="studio-mark">A</div>
-          <div className="studio-lines" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="studio-index" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
-        </aside>
+      <section className="home-intro" id="top">
+        <h1>Asakei</h1>
+        <p>技术、工具和长期写作笔记。</p>
       </section>
 
-      <section className="content-grid">
-        <div className="writing-column" id="writing">
-          <div className="section-heading">
-            <p className="section-label">{selectedTopic === "全部" ? "Latest writing" : selectedTopic}</p>
-            <h2>{selectedTopic === "全部" ? "近期文章" : "主题文章"}</h2>
-          </div>
-          <PostList posts={visiblePosts} />
+      <section className="writing-section" id="writing">
+        <div className="section-heading">
+          <h2>{selectedTopic === "全部" ? "文章" : selectedTopic}</h2>
+          <a href="#admin">写作</a>
         </div>
 
-        <AsideInfo selectedTopic={selectedTopic} topics={topics} />
+        <PostList posts={visiblePosts} />
       </section>
     </>
   );
@@ -397,50 +352,11 @@ function PostList({ posts }: { posts: Post[] }) {
             <p>{post.summary}</p>
             <div className="post-meta">
               <span>{post.draft ? "Draft" : `${post.minutes} min read`}</span>
-              {post.tags.map((tag) => (
-                <span key={tag}>{tag}</span>
-              ))}
             </div>
           </div>
-          <ArrowUpRight className="post-arrow" size={18} aria-hidden="true" />
         </a>
       ))}
     </div>
-  );
-}
-
-function AsideInfo({ selectedTopic, topics }: { selectedTopic: string; topics: string[] }) {
-  return (
-    <aside className="profile-column" aria-label="博客信息">
-      <div className="profile-block">
-        <p className="section-label">About</p>
-        <h2>安静索引。</h2>
-        <p>工程、工具和写作笔记。短一点，准一点。</p>
-      </div>
-
-      <div className="tool-strip" aria-label="快捷入口">
-        <a href="https://github.com/Asakeii" target="_blank" rel="noreferrer" aria-label="打开 GitHub">
-          <Github size={18} />
-        </a>
-        <a href="#admin" aria-label="管理博客">
-          <LayoutDashboard size={18} />
-        </a>
-        <a href="#topics" aria-label="查看主题">
-          <Tags size={18} />
-        </a>
-      </div>
-
-      <div className="topics" id="topics">
-        <p className="section-label">Topics</p>
-        <div>
-          {topics.map((topic) => (
-            <a className={selectedTopic === topic ? "is-active" : ""} href={topic === "全部" ? "#writing" : `#topic/${encodeURIComponent(topic)}`} key={topic}>
-              {topic}
-            </a>
-          ))}
-        </div>
-      </div>
-    </aside>
   );
 }
 
@@ -647,8 +563,7 @@ function AdminPage({
   return (
     <section className="admin-page page-panel" id="admin">
       <div className="admin-heading">
-        <p className="section-label">Blog admin</p>
-        <h1>写新的博客</h1>
+        <h1>写作</h1>
       </div>
 
       <div className="writing-workbench">
@@ -706,8 +621,7 @@ function AdminPage({
 
           <div className="live-markdown-canvas">
             <div className="canvas-toolbar">
-              <span>Typora style</span>
-              <span>符号可见 / 实时样式</span>
+              <span>Markdown</span>
             </div>
             <div className="live-canvas-surface">
               <MarkdownSourceView markdown={form.body} />

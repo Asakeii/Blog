@@ -765,7 +765,8 @@ footer a:hover {
 
 .live-canvas-surface {
   display: grid;
-  overflow: auto;
+  position: relative;
+  overflow: hidden;
   min-height: 0;
   background:
     linear-gradient(90deg, color-mix(in oklch, var(--line) 40%, transparent) 1px, transparent 1px) 0 0 / 48px 48px,
@@ -774,13 +775,13 @@ footer a:hover {
 }
 
 .canvas-toolbar,
-.rendered-layer,
+.markdown-source-view,
 .markdown-editor {
   padding-left: clamp(16px, 3vw, 28px);
   padding-right: clamp(16px, 3vw, 28px);
 }
 
-.rendered-layer,
+.markdown-source-view,
 .markdown-editor {
   grid-area: 1 / 1;
   min-height: 100%;
@@ -788,47 +789,89 @@ footer a:hover {
   padding-bottom: 38px;
 }
 
-.rendered-layer {
-  pointer-events: none;
-}
-
-.rendered-layer .markdown-body {
-  padding-bottom: 16vh;
-}
-
-.markdown-editor {
+.markdown-source-view {
+  overflow: hidden;
   color: var(--ink);
   font:
-    1.02rem/1.85 ui-monospace,
+    1.02rem/1.82 ui-monospace,
     SFMono-Regular,
     Menlo,
     Monaco,
     Consolas,
     "Liberation Mono",
     monospace;
+  pointer-events: none;
   white-space: pre-wrap;
-  outline: 0;
+  transition: transform 80ms linear;
 }
 
-.live-source {
-  caret-color: var(--primary);
+.source-line {
+  min-height: 1.82em;
+  color: color-mix(in oklch, var(--ink) 90%, var(--muted));
+}
+
+.source-heading {
+  color: var(--ink);
+  font-weight: 820;
+}
+
+.source-token {
+  color: var(--primary);
+  font-weight: 760;
+}
+
+.source-list-item .source-token,
+.source-quote .source-token {
+  color: var(--accent);
+}
+
+.source-quote {
+  color: color-mix(in oklch, var(--ink) 78%, var(--muted));
+}
+
+.source-code-fence,
+.source-code-line,
+.source-inline-code {
+  color: color-mix(in oklch, var(--ink) 86%, var(--primary));
+  background: color-mix(in oklch, var(--primary) 7%, transparent);
+}
+
+.source-strong strong {
+  font-weight: 850;
+}
+
+.source-link {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown-editor {
+  overflow: auto;
+  border: 0;
   color: transparent;
   background: transparent;
-  text-shadow: 0 0 0 transparent;
+  caret-color: var(--primary);
+  font:
+    1.02rem/1.82 ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  outline: 0;
+  resize: none;
+  white-space: pre-wrap;
 }
 
-.live-source::selection {
+.markdown-editor::selection {
   background: color-mix(in oklch, var(--primary) 24%, transparent);
   color: transparent;
 }
 
-.markdown-editor:empty::before {
-  content: attr(data-placeholder);
-  color: var(--muted);
-}
-
-.live-source:empty::before {
-  color: transparent;
+.markdown-editor::placeholder {
+  color: color-mix(in oklch, var(--muted) 78%, var(--ink));
 }
 
 .markdown-body {

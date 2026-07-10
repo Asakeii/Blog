@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowLeft, ArrowUpRight, Github, LayoutDashboard, PenLine, Plus, Save, Tags, Trash2 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -480,6 +480,123 @@ function MarkdownContent({ markdown }: { markdown: string }) {
   return <div className="markdown-body" dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+function MarkdownSourceView({ markdown }: { markdown: string }) {
+  const lines = markdown.split("\n");
+  let isCodeBlock = false;
+
+  return (
+    <div className="markdown-source-view" aria-hidden="true">
+      {lines.map((line, index) => {
+        const codeFence = line.match(/^(```.*)$/);
+
+        if (codeFence) {
+          isCodeBlock = !isCodeBlock;
+          return (
+            <div className="source-line source-code-fence" key={`${index}-${line}`}>
+              {line}
+            </div>
+          );
+        }
+
+        if (isCodeBlock) {
+          return (
+            <div className="source-line source-code-line" key={`${index}-${line}`}>
+              {line || " "}
+            </div>
+          );
+        }
+
+        const heading = line.match(/^(#{1,6})(\s+)(.*)$/);
+        if (heading) {
+          return (
+            <div className={`source-line source-heading source-heading-${heading[1].length}`} key={`${index}-${line}`}>
+              <span className="source-token">{heading[1]}</span>
+              {heading[2]}
+              <span>{heading[3]}</span>
+            </div>
+          );
+        }
+
+        const listItem = line.match(/^(\s*)([-*+]|\d+\.)(\s+)(.*)$/);
+        if (listItem) {
+          return (
+            <div className="source-line source-list-item" key={`${index}-${line}`}>
+              {listItem[1]}
+              <span className="source-token">{listItem[2]}</span>
+              {listItem[3]}
+              {renderSourceInline(listItem[4])}
+            </div>
+          );
+        }
+
+        const quote = line.match(/^(>\s?)(.*)$/);
+        if (quote) {
+          return (
+            <div className="source-line source-quote" key={`${index}-${line}`}>
+              <span className="source-token">{quote[1]}</span>
+              {renderSourceInline(quote[2])}
+            </div>
+          );
+        }
+
+        return (
+          <div className="source-line" key={`${index}-${line}`}>
+            {line ? renderSourceInline(line) : "\u00a0"}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function renderSourceInline(text: string) {
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+
+  text.replace(pattern, (match, _token, offset) => {
+    if (offset > cursor) {
+      parts.push(text.slice(cursor, offset));
+    }
+
+    if (match.startsWith("**")) {
+      parts.push(
+        <span className="source-strong" key={`${match}-${offset}`}>
+          <span className="source-token">**</span>
+          <strong>{match.slice(2, -2)}</strong>
+          <span className="source-token">**</span>
+        </span>,
+      );
+    } else if (match.startsWith("`")) {
+      parts.push(
+        <span className="source-inline-code" key={`${match}-${offset}`}>
+          <span className="source-token">`</span>
+          {match.slice(1, -1)}
+          <span className="source-token">`</span>
+        </span>,
+      );
+    } else {
+      const link = match.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      parts.push(
+        <span className="source-link" key={`${match}-${offset}`}>
+          <span className="source-token">[</span>
+          {link?.[1] ?? match}
+          <span className="source-token">]({link?.[2] ?? ""})</span>
+        </span>,
+      );
+    }
+
+    cursor = offset + match.length;
+    return match;
+  });
+
+  if (cursor < text.length) {
+    parts.push(text.slice(cursor));
+  }
+
+  return parts;
+}
+
 function AdminPage({
   deletedPosts,
   drafts,
@@ -503,9 +620,8 @@ function AdminPage({
 }) {
   const [form, setForm] = useState<DraftForm>(emptyDraftForm);
   const [newTopic, setNewTopic] = useState("");
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
-  const previewMarkdown = form.body.trim() || "# 从这里开始写\n\n输入 Markdown 时，画布会直接同步成文章样式。";
 
   const updateForm = (key: keyof DraftForm, value: string) => {
     setForm((current) => ({ ...current, [key]: value }));
@@ -514,9 +630,6 @@ function AdminPage({
   const resetForm = () => {
     setForm(emptyDraftForm);
     setNewTopic("");
-    if (editorRef.current) {
-      editorRef.current.innerText = emptyDraftForm.body;
-    }
   };
 
   const addTopicFromInput = () => {
@@ -530,12 +643,6 @@ function AdminPage({
     updateForm("topic", nextTopic);
     setNewTopic("");
   };
-
-  useEffect(() => {
-    if (editorRef.current && !editorRef.current.innerText) {
-      editorRef.current.innerText = emptyDraftForm.body;
-    }
-  }, []);
 
   return (
     <section className="admin-page page-panel" id="admin">
@@ -599,22 +706,25 @@ function AdminPage({
 
           <div className="live-markdown-canvas">
             <div className="canvas-toolbar">
-              <span>Live markdown</span>
-              <span>实时渲染</span>
+              <span>Typora style</span>
+              <span>符号可见 / 实时样式</span>
             </div>
             <div className="live-canvas-surface">
-              <div className="rendered-layer" aria-hidden="true">
-                <MarkdownContent markdown={previewMarkdown} />
-              </div>
-              <div
-                className="markdown-editor live-source"
-                contentEditable
-                data-placeholder="用 Markdown 写下你的博客..."
-                onInput={(event) => updateForm("body", event.currentTarget.innerText)}
+              <MarkdownSourceView markdown={form.body} />
+              <textarea
+                aria-label="Markdown 写作区"
+                className="markdown-editor markdown-source-input"
+                onChange={(event) => updateForm("body", event.target.value)}
+                onScroll={(event) => {
+                  const mirror = event.currentTarget.previousElementSibling;
+                  if (mirror instanceof HTMLElement) {
+                    mirror.style.transform = `translateY(-${event.currentTarget.scrollTop}px)`;
+                  }
+                }}
+                placeholder="用 Markdown 写下你的博客..."
                 ref={editorRef}
-                role="textbox"
                 spellCheck={false}
-                suppressContentEditableWarning
+                value={form.body}
               />
             </div>
           </div>

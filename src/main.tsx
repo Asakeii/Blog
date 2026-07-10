@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { StrictMode, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { ArrowLeft, Plus, Save, Trash2 } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -264,16 +264,16 @@ function App() {
   useEffect(() => {
     window.requestAnimationFrame(() => {
       if (route.page === "home" && window.location.hash === "#writing") {
-        document.getElementById("writing")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        document.getElementById("writing")?.scrollIntoView({ block: "start" });
         return;
       }
 
       if (route.page === "home" && route.topic !== "全部") {
-        document.getElementById("writing")?.scrollIntoView({ block: "start", behavior: "smooth" });
+        document.getElementById("writing")?.scrollIntoView({ block: "start" });
         return;
       }
 
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      window.scrollTo({ top: 0 });
     });
   }, [route.page, route.slug, route.topic]);
 
@@ -299,9 +299,6 @@ function App() {
         <HomePage visiblePosts={visiblePosts} selectedTopic={route.topic} />
       )}
 
-      <footer>
-        <span>© 2026 Asakei</span>
-      </footer>
     </main>
   );
 }
@@ -314,7 +311,7 @@ function Header() {
         <strong>Asakei</strong>
       </a>
       <nav>
-        <a href="#writing">文章</a>
+        <a href="#top">文章</a>
         <a href="#admin">写作</a>
       </nav>
     </header>
@@ -323,21 +320,15 @@ function Header() {
 
 function HomePage({ visiblePosts, selectedTopic }: { visiblePosts: Post[]; selectedTopic: string }) {
   return (
-    <>
-      <section className="home-intro" id="top">
-        <h1>Asakei</h1>
+    <section className="writing-section home-page" id="top">
+      <header className="home-heading">
+        <h1>{selectedTopic === "全部" ? "文章" : selectedTopic}</h1>
         <p>技术、工具和长期写作笔记。</p>
-      </section>
-
-      <section className="writing-section" id="writing">
-        <div className="section-heading">
-          <h2>{selectedTopic === "全部" ? "文章" : selectedTopic}</h2>
-          <a href="#admin">写作</a>
-        </div>
-
+      </header>
+      <div id="writing">
         <PostList posts={visiblePosts} />
-      </section>
-    </>
+      </div>
+    </section>
   );
 }
 
@@ -350,9 +341,7 @@ function PostList({ posts }: { posts: Post[] }) {
           <div>
             <h3>{post.title}</h3>
             <p>{post.summary}</p>
-            <div className="post-meta">
-              <span>{post.draft ? "Draft" : `${post.minutes} min read`}</span>
-            </div>
+            {post.draft ? <span className="draft-label">草稿</span> : null}
           </div>
         </a>
       ))}
@@ -378,12 +367,6 @@ function PostDetail({ post, onDeleteDraft }: { post: Post; onDeleteDraft?: (slug
       <time dateTime={post.date.replaceAll(".", "-")}>{post.date}</time>
       <h2>{post.title}</h2>
       <p className="post-detail-summary">{post.summary}</p>
-      <div className="post-meta">
-        <span>{post.draft ? "Draft" : `${post.minutes} min read`}</span>
-        {post.tags.map((tag) => (
-          <span key={tag}>{tag}</span>
-        ))}
-      </div>
       <div className="post-body">
         {post.markdown ? <MarkdownContent markdown={post.markdown} /> : post.body.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
       </div>
@@ -536,7 +519,7 @@ function AdminPage({
 }) {
   const [form, setForm] = useState<DraftForm>(emptyDraftForm);
   const [newTopic, setNewTopic] = useState("");
-  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const [view, setView] = useState<"write" | "manage">("write");
   const canSave = form.title.trim().length > 0 && form.body.trim().length > 0;
 
   const updateForm = (key: keyof DraftForm, value: string) => {
@@ -563,10 +546,13 @@ function AdminPage({
   return (
     <section className="admin-page page-panel" id="admin">
       <div className="admin-heading">
-        <h1>写作</h1>
+        <h1>{view === "write" ? "写作" : "文章管理"}</h1>
+        <button className="text-action" type="button" onClick={() => setView(view === "write" ? "manage" : "write")}>
+          {view === "write" ? "管理文章" : "返回写作"}
+        </button>
       </div>
 
-      <div className="writing-workbench">
+      {view === "write" ? (
         <form
           className="editor-panel"
           onSubmit={(event) => {
@@ -577,52 +563,56 @@ function AdminPage({
             }
           }}
         >
-          <div className="editor-toolbar">
-            <label>
-              <span>标题</span>
-              <input value={form.title} onChange={(event) => updateForm("title", event.target.value)} placeholder="新的博客标题" />
-            </label>
-            <label>
-              <span>摘要</span>
-              <input value={form.summary} onChange={(event) => updateForm("summary", event.target.value)} placeholder="一句话摘要" />
-            </label>
-            <label>
-              <span>主题</span>
-              <select value={form.topic} onChange={(event) => updateForm("topic", event.target.value)}>
-                {topics
-                  .filter((topic) => topic !== "全部")
-                  .map((topic) => (
-                    <option key={topic} value={topic}>
-                      {topic}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label>
-              <span>新主题</span>
-              <div className="topic-composer">
-                <input
-                  value={newTopic}
-                  onChange={(event) => setNewTopic(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      addTopicFromInput();
-                    }
-                  }}
-                  placeholder="例如：系统设计"
-                />
-                <button type="button" aria-label="新增主题" onClick={addTopicFromInput}>
-                  <Plus size={16} />
-                </button>
-              </div>
-            </label>
-          </div>
+          <input
+            aria-label="文章标题"
+            className="editor-title"
+            value={form.title}
+            onChange={(event) => updateForm("title", event.target.value)}
+            placeholder="文章标题"
+          />
+
+          <details className="editor-settings">
+            <summary>文章设置</summary>
+            <div className="editor-toolbar">
+              <label>
+                <span>摘要</span>
+                <input value={form.summary} onChange={(event) => updateForm("summary", event.target.value)} placeholder="默认取正文开头" />
+              </label>
+              <label>
+                <span>主题</span>
+                <select value={form.topic} onChange={(event) => updateForm("topic", event.target.value)}>
+                  {topics
+                    .filter((topic) => topic !== "全部")
+                    .map((topic) => (
+                      <option key={topic} value={topic}>
+                        {topic}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                <span>新主题</span>
+                <div className="topic-composer">
+                  <input
+                    value={newTopic}
+                    onChange={(event) => setNewTopic(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addTopicFromInput();
+                      }
+                    }}
+                    placeholder="例如：系统设计"
+                  />
+                  <button type="button" aria-label="新增主题" onClick={addTopicFromInput}>
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </label>
+            </div>
+          </details>
 
           <div className="live-markdown-canvas">
-            <div className="canvas-toolbar">
-              <span>Markdown</span>
-            </div>
             <div className="live-canvas-surface">
               <MarkdownSourceView markdown={form.body} />
               <textarea
@@ -636,7 +626,6 @@ function AdminPage({
                   }
                 }}
                 placeholder="用 Markdown 写下你的博客..."
-                ref={editorRef}
                 spellCheck={false}
                 value={form.body}
               />
@@ -653,7 +642,7 @@ function AdminPage({
             </button>
           </div>
         </form>
-
+      ) : (
         <div className="manage-panel">
           <div className="manage-section">
             <h2>草稿</h2>
@@ -709,7 +698,7 @@ function AdminPage({
             )}
           </div>
         </div>
-      </div>
+      )}
     </section>
   );
 }
